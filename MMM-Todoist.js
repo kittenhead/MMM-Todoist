@@ -58,7 +58,7 @@ Module.register("MMM-Todoist", {
 		// 	"#ffcc00", "#74e8d3", "#3bd5fb", "#dc4fad", "#ac193d", "#d24726", "#82ba00", "#03b3b2", "#008299",
 		// 	"#5db2ff", "#0072c6", "#000000", "#777777"
 		// ], //These colors come from Todoist and their order matters if you want the colors to match your Todoist project colors.
-		
+
 		//TODOIST Change how they are doing Project Colors, so now I'm changing it.
 		projectColors: {
 			30:'#B8255F',
@@ -232,21 +232,21 @@ Module.register("MMM-Todoist", {
 			this.tasks = payload.items || payload; // Adjust for REST v2 structure
 			this.updateDom();
 		}
-	},	
+	},
 
 	filterTodoistData: function(tasks) {
 		var self = this;
 		var items = [];
-	
+
 		if (!tasks || !Array.isArray(tasks)) {
 			console.error("Invalid tasks data:", tasks);
 			return;
 		}
-	
+
 		// Process each task
 		tasks.forEach(function(item) {
 			if (item.parent_id != null && !self.config.displaySubtasks) return;
-	
+
 			if (self.config.labels.length > 0 && item.labels.length > 0) {
 				for (let label of item.labels) {
 					for (let labelName of self.config.labels) {
@@ -257,7 +257,7 @@ Module.register("MMM-Todoist", {
 					}
 				}
 			}
-	
+
 			if (self.config.projects.length > 0) {
 				self.config.projects.forEach(function(project) {
 					if (String(item.project_id) === String(project)) {
@@ -267,7 +267,7 @@ Module.register("MMM-Todoist", {
 				});
 			}
 		});
-	
+
 		// Sort by due date descending
 		if (self.config.sortType === "dueDateDesc") {
 			items.sort((a, b) => {
@@ -276,11 +276,11 @@ Module.register("MMM-Todoist", {
 				return dateB - dateA;
 			});
 		}
-	
+
 		items = items.slice(0, this.config.maximumEntries);
-	
+
 		this.tasks = { items: items };
-	},		
+	},
 	/*
 	 * The Todoist API returns task due dates as strings in these two formats: YYYY-MM-DD and YYYY-MM-DDThh:mm:ss
 	 * This depends on whether a task only has a due day or a due day and time. You cannot pass this date string into
@@ -291,13 +291,13 @@ Module.register("MMM-Todoist", {
 	 */
 	parseDueDate: function(date) {
 		if (!date) return null;
-		
+
 		// Handle both date-only and datetime formats
 		const isoDate = date.endsWith("Z") ? date : date + "T00:00:00Z";
 		const parsedDate = new Date(isoDate);
-		
+
 		return isNaN(parsedDate) ? null : parsedDate;
-	},	
+	},
 	sortByTodoist: function (itemstoSort) {
 		itemstoSort.sort(function (a, b) {
 			if (!a.parent_id && !b.parent_id) {
@@ -391,7 +391,7 @@ Module.register("MMM-Todoist", {
 			// this item is a subtask so indent it
 			taskText = '- ' + taskText;
 		}
-		return this.createCell("title bright alignLeft", 
+		return this.createCell("title bright alignLeft",
 			this.shorten(taskText, this.config.maxTitleLength, this.config.wrapEvents));
 
 		// return this.createCell("title bright alignLeft", item.content);
@@ -400,12 +400,10 @@ Module.register("MMM-Todoist", {
 		var className = "bright align-right dueDate ";
 		var innerHTML = "";
 		var oneDay = 24 * 60 * 60 * 1000;
-	
+		
 		var dueDateTime = this.parseDueDate(item.due?.date);
 		if (!dueDateTime) {
-			innerHTML = "No Due Date"; // Handle tasks without a due date
-			className += "xsmall";
-			return this.createCell(className, innerHTML);
+			return this.createCell("xsmall", "No Due Date");
 		}
 	
 		var dueDate = new Date(dueDateTime.getFullYear(), dueDateTime.getMonth(), dueDateTime.getDate());
@@ -413,45 +411,49 @@ Module.register("MMM-Todoist", {
 		var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 		var diffDays = Math.floor((dueDate - today) / oneDay);
 	
+		// Base styling
+		className += "xsmall ";
+	
+		// Color coding and content
 		if (diffDays < -1) {
+			className += "overdue ";
 			innerHTML = dueDate.toLocaleDateString(config.language, { month: "short" }) + " " + dueDate.getDate();
-			className += "xsmall overdue";
-			if (this.config.flashOverdueTasks) {
-				className += " flash"; // Add flashing effect for overdue tasks
-			}
+			if (this.config.flashOverdueTasks) className += "flash ";
 		} else if (diffDays === -1) {
+			className += "overdue ";
 			innerHTML = this.translate("YESTERDAY");
-			className += "xsmall overdue";
-			if (this.config.flashOverdueTasks) {
-				className += " flash"; // Add flashing effect for yesterday's overdue tasks
-			}
+			if (this.config.flashOverdueTasks) className += "flash ";
 		} else if (diffDays === 0) {
+			className += (dueDateTime >= now) ? "today " : "overdue ";
 			innerHTML = this.translate("TODAY");
-			className += item.all_day || dueDateTime >= now ? "today" : "overdue";
-			if (this.config.flashOverdueTasks && diffDays < 0) {
-				className += " flash"; // Add flashing effect for today's overdue tasks
-			}
-		} else if (diffDays === 1) {
-			innerHTML = this.translate("TOMORROW");
-			className += "xsmall tomorrow";
-		} else if (diffDays < 7) {
+			if (this.config.flashOverdueTasks && !dueDateTime >= now) className += "flash ";
+		} else if (diffDays >= 1 && diffDays <= 2) {
+			className += "due-1-2days ";
+			innerHTML = diffDays === 1 ? this.translate("TOMORROW") : dueDate.toLocaleDateString(config.language, { weekday: "short" });
+		} else if (diffDays >= 3 && diffDays <= 5) {
+			className += "due-3-5days ";
 			innerHTML = dueDate.toLocaleDateString(config.language, { weekday: "short" });
-			className += "xsmall";
+		} else if (diffDays === 6) {
+			className += "due-6days ";
+			innerHTML = dueDate.toLocaleDateString(config.language, { weekday: "short" });
+		} else if (diffDays === 7) {
+			className += "due-7days ";
+			innerHTML = dueDate.toLocaleDateString(config.language, { weekday: "short" });
 		} else {
+			className += "neutral ";
 			innerHTML = dueDate.toLocaleDateString(config.language, { month: "short" }) + " " + dueDate.getDate();
-			className += "xsmall";
 		}
 	
-		return this.createCell(className, innerHTML);
+		return this.createCell(className.trim(), innerHTML);
 	},		
-			
+
 	addProjectCell: function(item) {
 		var project = this.tasks.projects.find(p => p.id === item.project_id);
 		var projectcolor = this.config.projectColors[project.color];
 		var innerHTML = "<span class='projectcolor' style='color: " + projectcolor + "; background-color: " + projectcolor + "'></span>" + project.name;
 		return this.createCell("xsmall", innerHTML);
 	},
-	addAssigneeAvatorCell: function(item, collaboratorsMap) {	
+	addAssigneeAvatorCell: function(item, collaboratorsMap) {
 		var avatarImg = document.createElement("img");
 		avatarImg.className = "todoAvatarImg";
 
@@ -467,34 +469,34 @@ Module.register("MMM-Todoist", {
 	},
 	getDom: function() {
 		var wrapper = document.createElement("div");
-	
+
 		if (!this.tasks || this.tasks.length === 0) {
 			wrapper.innerHTML = "No tasks to display.";
 			return wrapper;
 		}
-	
+
 		var table = document.createElement("table");
 		table.className = "todoTable";
-	
+
 		this.tasks.forEach((task) => {
 			var row = document.createElement("tr");
 			row.className = "todoRow";
-	
+
 			// Add priority indicator cell
 			var priorityCell = this.addPriorityIndicatorCell(task);
 			row.appendChild(priorityCell);
-	
+
 			// Add task text cell
 			var textCell = this.addTodoTextCell(task);
 			row.appendChild(textCell);
-	
+
 			// Add due date cell
 			var dueDateCell = this.addDueDateCell(task);
 			row.appendChild(dueDateCell);
-	
+
 			table.appendChild(row);
 		});
-	
+
 		wrapper.appendChild(table);
 		return wrapper;
 	},
