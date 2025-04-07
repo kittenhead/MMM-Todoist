@@ -401,7 +401,6 @@ Module.register("MMM-Todoist", {
 		var innerHTML = "";
 		var oneDay = 24 * 60 * 60 * 1000;
 	
-		// Parse the due date using the updated function
 		var dueDateTime = this.parseDueDate(item.due?.date);
 		if (!dueDateTime) {
 			innerHTML = "No Due Date"; // Handle tasks without a due date
@@ -417,12 +416,21 @@ Module.register("MMM-Todoist", {
 		if (diffDays < -1) {
 			innerHTML = dueDate.toLocaleDateString(config.language, { month: "short" }) + " " + dueDate.getDate();
 			className += "xsmall overdue";
+			if (this.config.flashOverdueTasks) {
+				className += " flash"; // Add flashing effect for overdue tasks
+			}
 		} else if (diffDays === -1) {
 			innerHTML = this.translate("YESTERDAY");
 			className += "xsmall overdue";
+			if (this.config.flashOverdueTasks) {
+				className += " flash"; // Add flashing effect for yesterday's overdue tasks
+			}
 		} else if (diffDays === 0) {
 			innerHTML = this.translate("TODAY");
 			className += item.all_day || dueDateTime >= now ? "today" : "overdue";
+			if (this.config.flashOverdueTasks && diffDays < 0) {
+				className += " flash"; // Add flashing effect for today's overdue tasks
+			}
 		} else if (diffDays === 1) {
 			innerHTML = this.translate("TOMORROW");
 			className += "xsmall tomorrow";
@@ -435,8 +443,8 @@ Module.register("MMM-Todoist", {
 		}
 	
 		return this.createCell(className, innerHTML);
-	},
-		
+	},		
+			
 	addProjectCell: function(item) {
 		var project = this.tasks.projects.find(p => p.id === item.project_id);
 		var projectcolor = this.config.projectColors[project.color];
