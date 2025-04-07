@@ -26,40 +26,42 @@ module.exports = NodeHelper.create({
 		}
 	},
 
-	fetchTodos : function() {
+	fetchTodos: function() {
 		var self = this;
-		//request.debug = true;
 		var accessToken = self.config.accessToken;
-
-		// Change request format (old Sync API -> REST v2):
+	
 		request({
-			url: self.config.apiBase + "/tasks", // Updated endpoint
-			method: "GET", // Changed from POST to GET
+			url: self.config.apiBase + "/tasks",
+			method: "GET",
 			headers: {
 				"Authorization": "Bearer " + accessToken,
 				"Content-Type": "application/json"
-			},
-		// Remove old 'form' parameters
-		},
-		function(error, response, body) {
+			}
+		}, function(error, response, body) {
 			if (error) {
-				self.sendSocketNotification("FETCH_ERROR", {
-					error: error
-				});
-				return console.error(" ERROR - MMM-Todoist: " + error);
+				self.sendSocketNotification("FETCH_ERROR", { error: error });
+				return console.error("ERROR - MMM-Todoist: " + error);
 			}
-			if(self.config.debug){
-				console.log(body);
-			}
+	
 			if (response.statusCode === 200) {
 				var tasks = JSON.parse(body);
-			
+	
+				// Sort tasks by due date descending
+				tasks.sort((a, b) => {
+					const dateA = a.due?.date ? new Date(a.due.date) : new Date(8640000000000000); // Future date
+					const dateB = b.due?.date ? new Date(b.due.date) : new Date(8640000000000000);
+				
+					return self.config.sortType === "dueDateAsc" 
+						? dateA - dateB 
+						: dateB - dateA;
+				});				
+	
 				tasks.forEach((item) => {
 					item.contentHtml = markdown.makeHtml(item.content); // Convert content to HTML
 				});
-			
-				self.sendSocketNotification("TASKS", tasks); // Send tasks directly as an array
-			}									
+	
+				self.sendSocketNotification("TASKS", tasks); // Send sorted tasks
+			}
 		});
-	}
+	}	
 });
