@@ -291,15 +291,17 @@ Module.register("MMM-Todoist", {
 	 * to the same timezone.
 	 */
 	parseDueDate: function (date) {
+		if (!date) return null; // Handle cases where 'date' is null
 		let [year, month, day, hour = 0, minute = 0, second = 0] = date.split(/\D/).map(Number);
-
-		// If the task's due date has a timezone set (as opposed to the default floating timezone), it's given in UTC time.
-		if (date[date.length -1] === "Z") {
+	
+		// If the date ends with 'Z', it's in UTC format
+		if (date.endsWith("Z")) {
 			return new Date(Date.UTC(year, month - 1, day, hour, minute, second));
 		}
-
+	
+		// Otherwise, treat it as local time
 		return new Date(year, month - 1, day, hour, minute, second);
-	},
+	},	
 	sortByTodoist: function (itemstoSort) {
 		itemstoSort.sort(function (a, b) {
 			if (!a.parent_id && !b.parent_id) {
@@ -398,73 +400,47 @@ Module.register("MMM-Todoist", {
 
 		// return this.createCell("title bright alignLeft", item.content);
 	},
-	addDueDateCell: function(item) {
+	addDueDateCell: function (item) {
 		var className = "bright align-right dueDate ";
 		var innerHTML = "";
-		
 		var oneDay = 24 * 60 * 60 * 1000;
-		var dueDateTime = this.parseDueDate(item.due.date);
+	
+		// Parse the due date using the updated function
+		var dueDateTime = this.parseDueDate(item.due?.date);
+		if (!dueDateTime) {
+			innerHTML = "No Due Date"; // Handle tasks without a due date
+			className += "xsmall";
+			return this.createCell(className, innerHTML);
+		}
+	
 		var dueDate = new Date(dueDateTime.getFullYear(), dueDateTime.getMonth(), dueDateTime.getDate());
 		var now = new Date();
 		var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-		var diffDays = Math.floor((dueDate - today) / (oneDay));
-		var diffMonths = (dueDate.getFullYear() * 12 + dueDate.getMonth()) - (now.getFullYear() * 12 + now.getMonth());
-
+		var diffDays = Math.floor((dueDate - today) / oneDay);
+	
 		if (diffDays < -1) {
-			innerHTML = dueDate.toLocaleDateString(config.language, {
-												"month": "short"
-											}) + " " + dueDate.getDate();
+			innerHTML = dueDate.toLocaleDateString(config.language, { month: "short" }) + " " + dueDate.getDate();
 			className += "xsmall overdue";
 		} else if (diffDays === -1) {
 			innerHTML = this.translate("YESTERDAY");
 			className += "xsmall overdue";
 		} else if (diffDays === 0) {
 			innerHTML = this.translate("TODAY");
-			if (item.all_day || dueDateTime >= now) {
-				className += "today";
-			} else {
-				className += "overdue";
-			}
+			className += item.all_day || dueDateTime >= now ? "today" : "overdue";
 		} else if (diffDays === 1) {
 			innerHTML = this.translate("TOMORROW");
 			className += "xsmall tomorrow";
 		} else if (diffDays < 7) {
-			innerHTML = dueDate.toLocaleDateString(config.language, {
-				"weekday": "short"
-			});
-			className += "xsmall";
-		} else if (diffMonths < 7 || dueDate.getFullYear() == now.getFullYear()) {
-			innerHTML = dueDate.toLocaleDateString(config.language, {
-				"month": "short"
-			}) + " " + dueDate.getDate();
-			className += "xsmall";
-		} else if (item.due.date === "2100-12-31") {
-			innerHTML = "";
+			innerHTML = dueDate.toLocaleDateString(config.language, { weekday: "short" });
 			className += "xsmall";
 		} else {
-			innerHTML = dueDate.toLocaleDateString(config.language, {
-				"month": "short"
-			}) + " " + dueDate.getDate() + " " + dueDate.getFullYear();
+			innerHTML = dueDate.toLocaleDateString(config.language, { month: "short" }) + " " + dueDate.getDate();
 			className += "xsmall";
 		}
-
-		if (innerHTML !== "" && !item.all_day) {
-			function formatTime(d) {
-				function z(n) {
-					return (n < 10 ? "0" : "") + n;
-				}
-				var h = d.getHours();
-				var m = z(d.getMinutes());
-				if (config.timeFormat == 12) {
-					return " " + (h % 12 || 12) + ":" + m + (h < 12 ? " AM" : " PM");
-				} else {
-					return " " + h + ":" + m;
-				}
-			}
-			innerHTML += formatTime(dueDateTime);
-		}
+	
 		return this.createCell(className, innerHTML);
 	},
+		
 	addProjectCell: function(item) {
 		var project = this.tasks.projects.find(p => p.id === item.project_id);
 		var projectcolor = this.config.projectColors[project.color];
@@ -500,14 +476,17 @@ Module.register("MMM-Todoist", {
 			var row = document.createElement("tr");
 			row.className = "todoRow";
 	
-			var priorityCell = document.createElement("td");
-			priorityCell.className = "priority priority" + task.priority;
+			// Add priority indicator cell
+			var priorityCell = this.addPriorityIndicatorCell(task);
 			row.appendChild(priorityCell);
 	
-			var contentCell = document.createElement("td");
-			contentCell.className = "todoTextCell";
-			contentCell.innerHTML = task.contentHtml || task.content; // Use HTML-rendered content
-			row.appendChild(contentCell);
+			// Add task text cell
+			var textCell = this.addTodoTextCell(task);
+			row.appendChild(textCell);
+	
+			// Add due date cell
+			var dueDateCell = this.addDueDateCell(task);
+			row.appendChild(dueDateCell);
 	
 			table.appendChild(row);
 		});
@@ -515,6 +494,4 @@ Module.register("MMM-Todoist", {
 		wrapper.appendChild(table);
 		return wrapper;
 	},
-	
-
 });
