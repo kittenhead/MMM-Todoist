@@ -117,9 +117,9 @@
     padding-left: 10px; /* Add spacing between text and due date */
 }
 @keyframes flash {
-    0% { color: red; font-weight: bold; text-transform: uppercase; }
-    50% { color: transparent; font-weight: bold; text-transform: uppercase; }
-    100% { color: red; font-weight: bold; text-transform: uppercase; }
+    0% { opacity: 1; }
+    50% { opacity: 0.3; }
+    100% { opacity: 1; }
 }
 
 .overdue.flash {
@@ -130,3 +130,12 @@
     font-weight: bold; /* Make text bold */
     text-transform: uppercase; /* Capitalize text */
 }
+/* Due Date Color Coding */
+.due-7days { color: #4180FF; }      /* 7 days - Blue */
+.due-6days { color: #5db2ff; }      /* 6 days - Light Blue */
+.due-3-5days { color: #ff9933; }    /* 3-5 days - Orange */
+.due-1-2days { color: #ff4500; }    /* 1-2 days - Dark Orange */
+.overdue { color: #ff0000; }        /* Overdue - Red */
+
+
+
