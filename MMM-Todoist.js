@@ -61,35 +61,33 @@ Module.register("MMM-Todoist", {
 		
 		//TODOIST Change how they are doing Project Colors, so now I'm changing it.
 		projectColors: {
-			30:'#b8256f',
-			31:'#db4035',
-			32:'#ff9933',
-			33:'#fad000',
-			34:'#afb83b',
-			35:'#7ecc49',
-			36:'#299438',
-			37:'#6accbc',
-			38:'#158fad',
-			39:'#14aaf5',
-			40:'#96c3eb',
-			41:'#4073ff',
-			42:'#884dff',
-			43:'#af38eb',
-			44:'#eb96eb',
-			45:'#e05194',
-			46:'#ff8d85',
+			30:'#B8255F',
+			31:'#DC4C3E',
+			32:'#C77100',
+			33:'#B29104',
+			34:'#949C31',
+			35:'#65A33A',
+			36:'#369307',
+			37:'#42A393',
+			38:'#148FAD',
+			39:'#319DC0',
+			40:'#6988A4',
+			41:'#4180FF',
+			42:'#692EC2',
+			43:'#CA3FEE',
+			44:'#A4698C',
+			45:'#E05095',
+			46:'#C9766F',
 			47:'#808080',
-			48:'#b8b8b8',
-			49:'#ccac93'
+			48:'#999999',
+			49:'#8F7A69'
 		},
 
 		//This has been designed to use the Todoist Sync API.
-		apiVersion: "v9",
-		apiBase: "https://todoist.com/API",
-		todoistEndpoint: "sync",
-
-		todoistResourceType: "[\"items\", \"projects\", \"collaborators\", \"user\", \"labels\"]",
-
+		apiVersion: "v2",
+		apiBase: "https://api.todoist.com/rest/v2",
+		todoistEndpoint: "tasks", // Was "projects"
+		todoistResourceType: "items", // Simplified from old sync format
 		debug: false
 	},
 
@@ -228,172 +226,62 @@ Module.register("MMM-Todoist", {
 
 	// Override socket notification handler.
 	// ******** Data sent from the Backend helper. This is the data from the Todoist API ************
-	socketNotificationReceived: function (notification, payload) {
+	socketNotificationReceived: function(notification, payload) {
 		if (notification === "TASKS") {
-			this.filterTodoistData(payload);
-
-			if (this.config.displayLastUpdate) {
-				this.lastUpdate = Date.now() / 1000; //save the timestamp of the last update to be able to display it
-				Log.log("ToDoIst update OK, project : " + this.config.projects + " at : " + moment.unix(this.lastUpdate).format(this.config.displayLastUpdateFormat)); //AgP
-			}
-
-			this.loaded = true;
-			this.updateDom(1000);
-		} else if (notification === "FETCH_ERROR") {
-			Log.error("Todoist Error. Could not fetch todos: " + payload.error);
+			console.log("Received tasks:", payload); // Debug log
+			this.tasks = payload.items || payload; // Adjust for REST v2 structure
+			this.updateDom();
 		}
-	},
+	},	
 
 	filterTodoistData: function (tasks) {
 		var self = this;
 		var items = [];
 		var labelIds = [];
-
-		if (tasks == undefined) {
+	
+		// Ensure tasks is a valid array
+		if (!tasks || !Array.isArray(tasks)) {
+			console.error("Invalid tasks data:", tasks);
 			return;
 		}
-		if (tasks.accessToken != self.config.accessToken) {
-			return;
-		}
-		if (tasks.items == undefined) {
-			return;
-		}
-
-		if (this.config.blacklistProjects) {
-			// take all projects in payload, and remove the ones specified by user
-			// i.e., convert user's "whitelist" into a "blacklist"
-			this.config.projects = [];
-			tasks.projects.forEach(project => {
-				if(this.userList.includes(project.id)) {
-					return; // blacklisted
-				}
-				this.config.projects.push(project.id);
-			});
-			if(self.config.debug) {
-				console.log("MMM-Todoist: original list of projects was blacklisted.\n" +
-					"Only considering the following projects:");
-				console.log(this.config.projects);
+	
+		// Process each task
+		tasks.forEach(function (item) {
+			// Ignore sub-tasks if configured
+			if (item.parent_id != null && !self.config.displaySubtasks) {
+				return;
 			}
-		}
-		/* Not needed for labels, but kept for reuse elsewhere
-		// Loop through labels fetched from API and find corresponding label IDs for task filtering
-		// Could be re-used for project names -> project IDs.
-		if (self.config.labels.length>0 && tasks.labels != undefined) {
-			for (let apiLabel of tasks.labels) {
-				for (let configLabelName of self.config.labels) {
-					if (apiLabel.name == configLabelName) {
-						labelIds.push(apiLabel.id);
-						break;
+	
+			// Filter by labels if configured
+			if (self.config.labels.length > 0 && item.labels.length > 0) {
+				for (let label of item.labels) {
+					for (let labelName of self.config.labels) {
+						if (label === labelName) {
+							items.push(item);
+							return;
+						}
 					}
 				}
 			}
-		}
-		*/
-		if (self.config.displayTasksWithinDays > -1 || !self.config.displayTasksWithoutDue) {
-			tasks.items = tasks.items.filter(function (item) {
-				if (item.due === null) {
-					return self.config.displayTasksWithoutDue;
-				}
-
-				var oneDay = 24 * 60 * 60 * 1000;
-				var dueDateTime = self.parseDueDate(item.due.date);
-				var dueDate = new Date(dueDateTime.getFullYear(), dueDateTime.getMonth(), dueDateTime.getDate());
-				var now = new Date();
-				var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-				var diffDays = Math.floor((dueDate - today) / (oneDay));
-				return diffDays <= self.config.displayTasksWithinDays;
-			});
-		}
-
-		//Filter the Todos by the criteria specified in the Config
-		tasks.items.forEach(function (item) {
-			// Ignore sub-tasks
-			if (item.parent_id!=null && !self.config.displaySubtasks) { return; }
-
-			// Filter using label if a label is configured
-			if (self.config.labels.length > 0 && item.labels.length > 0) {
-        			// Check all the labels assigned to the task. Add to items if match with configured label
-        			for (let label of item.labels) {
-          				for (let labelName of self.config.labels) {
-            					if (label == labelName) { //the string returned from SyncAPI matches the strong in config
-              						items.push(item);
-              						return;
-            					}
-          				}
-        			}
-      			}
-
-			// Filter using projets if projects are configured
-			if (self.config.projects.length>0){
-			  self.config.projects.forEach(function (project) {
-			  		if (item.project_id == project) {
+	
+			// Filter by projects if configured
+			if (self.config.projects.length > 0) {
+				self.config.projects.forEach(function (project) {
+					if (item.project_id == project) {
 						items.push(item);
 						return;
 					}
-			  });
+				});
 			}
 		});
-
-		//**** FOR DEBUGGING TO HELP PEOPLE GET THEIR PROJECT IDs */
-		if (self.config.debug) {
-			console.log("%c *** PROJECT -- ID ***", "background: #222; color: #bada55");
-			tasks.projects.forEach(project => {
-				console.log("%c" + project.name + " -- " + project.id, "background: #222; color: #bada55");
-			});
-		};
-		//****** */
-
-		//Used for ordering by date
-		items.forEach(function (item) {
-			if (item.due === null) {
-				item.due = {};
-				item.due["date"] = "2100-12-31";
-				item.all_day = true;
-			}
-			// Used to sort by date.
-			item.date = self.parseDueDate(item.due.date);
-
-			// as v8 API does not have 'all_day' field anymore then check due.date for presence of time
-			// if due.date has a time then set item.all_day to false else all_day is true
-			if (item.due.date.length > 10) {
-				item.all_day = false;
-			} else {
-				item.all_day = true;
-			}
-		});
-
-		//***** Sorting code if you want to add new methods. */
-		switch (self.config.sortType) {
-		case "todoist":
-			sorteditems = self.sortByTodoist(items);
-			break;
-		case 'priority':
-			sorteditems = self.sortByPriority(items);
-			break;
-		case "dueDateAsc":
-			sorteditems = self.sortByDueDateAsc(items);
-			break;
-		case "dueDateDesc":
-			sorteditems = self.sortByDueDateDesc(items);
-			break;
-		case "dueDateDescPriority":
-			sorteditems = self.sortByDueDateDescPriority(items);
-			break;
-		default:
-			sorteditems = self.sortByTodoist(items);
-			break;
-		}
-
-		//Slice by max Entries
+	
+		// Sort and slice tasks based on configuration
 		items = items.slice(0, this.config.maximumEntries);
-
+	
 		this.tasks = {
-			"items": items,
-			"projects": tasks.projects,
-			"collaborators": tasks.collaborators
+			items: items,
 		};
-
-	},
+	},	
 	/*
 	 * The Todoist API returns task due dates as strings in these two formats: YYYY-MM-DD and YYYY-MM-DDThh:mm:ss
 	 * This depends on whether a task only has a due day or a due day and time. You cannot pass this date string into
@@ -597,91 +485,36 @@ Module.register("MMM-Todoist", {
 
 		return cell;
 	},
-	getDom: function () {
-	
-		if (this.config.hideWhenEmpty && this.tasks.items.length===0) {
-			return null;
-		}
-	
-		//Add a new div to be able to display the update time alone after all the task
+	getDom: function() {
 		var wrapper = document.createElement("div");
-
-		//display "loading..." if not loaded
-		if (!this.loaded) {
-			wrapper.innerHTML = "Loading...";
-			wrapper.className = "dimmed light small";
+	
+		if (!this.tasks || this.tasks.length === 0) {
+			wrapper.innerHTML = "No tasks to display.";
 			return wrapper;
 		}
-
-
-		//New CSS based Table
-		var divTable = document.createElement("div");
-		divTable.className = "divTable normal small light";
-
-		var divBody = document.createElement("div");
-		divBody.className = "divTableBody";
-		
-		if (this.tasks === undefined) {
-			return wrapper;
-		}
-
-		// create mapping from user id to collaborator index
-		var collaboratorsMap = new Map();
-
-		for (var value=0; value < this.tasks.collaborators.length; value++) {
-			collaboratorsMap.set(this.tasks.collaborators[value].id, value);
-		}
-
-		//Iterate through Todos
-		this.tasks.items.forEach(item => {
-			var divRow = document.createElement("div");
-			//Add the Row
-			divRow.className = "divTableRow";
-			
-
-			//Columns
-			divRow.appendChild(this.addPriorityIndicatorCell(item));
-			divRow.appendChild(this.addColumnSpacerCell());
-			divRow.appendChild(this.addTodoTextCell(item));
-			divRow.appendChild(this.addDueDateCell(item));
-			if (this.config.showProject) {
-				divRow.appendChild(this.addColumnSpacerCell());
-				divRow.appendChild(this.addProjectCell(item));
-			}
-			if (this.config.displayAvatar) {
-				divRow.appendChild(this.addAssigneeAvatorCell(item, collaboratorsMap));
-			}
-
-			divBody.appendChild(divRow);
+	
+		var table = document.createElement("table");
+		table.className = "todoTable";
+	
+		this.tasks.forEach((task) => {
+			var row = document.createElement("tr");
+			row.className = "todoRow";
+	
+			var priorityCell = document.createElement("td");
+			priorityCell.className = "priority priority" + task.priority;
+			row.appendChild(priorityCell);
+	
+			var contentCell = document.createElement("td");
+			contentCell.className = "todoTextCell";
+			contentCell.innerHTML = task.contentHtml || task.content; // Use HTML-rendered content
+			row.appendChild(contentCell);
+	
+			table.appendChild(row);
 		});
-		
-		divTable.appendChild(divBody);
-		wrapper.appendChild(divTable);
-
-		// create the gradient
-		if (this.config.fade && this.config.fadePoint < 1) divTable.querySelectorAll('.divTableRow').forEach((row, i, rows) => row.style.opacity = Math.max(0, Math.min(1 - ((((i + 1) * (1 / (rows.length))) - this.config.fadePoint) / (1 - this.config.fadePoint)) * (1 - this.config.fadeMinimumOpacity), 1)));
-
-		// display the update time at the end, if defined so by the user config
-		if (this.config.displayLastUpdate) {
-			var updateinfo = document.createElement("div");
-			updateinfo.className = "xsmall light align-left";
-			updateinfo.innerHTML = "Update : " + moment.unix(this.lastUpdate).format(this.config.displayLastUpdateFormat);
-			wrapper.appendChild(updateinfo);
-		}
-
-		//**** FOR DEBUGGING TO HELP PEOPLE GET THEIR PROJECT IDs - (People who can't see console) */
-		if (this.config.debug) {
-			var projectsids = document.createElement("div");
-			projectsids.className = "xsmall light align-left";
-			projectsids.innerHTML = "<span>*** PROJECT -- ID ***</span><br />";
-			this.tasks.projects.forEach(project => {
-				projectsids.innerHTML += "<span>" + project.name + " -- " + project.id + "</span><br />";
-			});
-			wrapper.appendChild(projectsids);
-		};
-		//****** */
-
+	
+		wrapper.appendChild(table);
 		return wrapper;
-	}
+	},
+	
 
 });
