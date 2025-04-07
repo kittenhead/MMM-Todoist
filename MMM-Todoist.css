@@ -1,19 +1,30 @@
-.priority {
-    width: 3px;
-    border-right: 3px;
-}
+/* Project colors - REST v2 palette */
+.projectcolor.berry_red { background-color: #B8255F; }
+.projectcolor.red { background-color: #DC4C3E; }
+.projectcolor.orange { background-color: #C77100; }
+.projectcolor.yellow { background-color: #B29104; }
+.projectcolor.olive_green { background-color: #949C31; }
+.projectcolor.lime_green { background-color: #65A33A; }
+.projectcolor.green { background-color: #369307; }
+.projectcolor.mint_green { background-color: #42A393; }
+.projectcolor.teal { background-color: #148FAD; }
+.projectcolor.sky_blue { background-color: #319DC0; }
+.projectcolor.light_blue { background-color: #6988A4; }
+.projectcolor.blue { background-color: #4180FF; }
+.projectcolor.grape { background-color: #692EC2; }
+.projectcolor.violet { background-color: #CA3FEE; }
+.projectcolor.lavender { background-color: #A4698C; }
+.projectcolor.magenta { background-color: #E05095; }
+.projectcolor.salmon { background-color: #C9766F; }
+.projectcolor.charcoal { background-color: #808080; }
+.projectcolor.grey { background-color: #999999; }
+.projectcolor.taupe { background-color: #8F7A69; }
 
-.priority1 {
-    background-color: #D1453B;
-}
-
-.priority2 {
-    background-color: #EB8909;
-}
-
-.priority3 {
-    background-color: #246FE0;
-}
+/* Priority indicators (REST v2 uses 1-4 priority levels) */
+.priority1 { background-color: #D1453B; } /* Highest priority */
+.priority2 { background-color: #EB8909; }
+.priority3 { background-color: #246FE0; }
+.priority4 { background-color: transparent; } /* No color for natural priority */
 
 .alignLeft {
     text-align: left;
@@ -36,14 +47,14 @@
 }
 
 .projectcolor {
-    padding: 0 !important;
-    margin-right: 4px !important;
-    display: inline-block;
-    width: 12px;
-    height: 12px;
-    border-radius: 12px;
-    vertical-align: top;
-    margin-top: 3px;
+  padding: 0 !important;
+  margin-right: 4px !important;
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 12px;
+  vertical-align: top;
+  margin-top: 3px;
 }
 
 
@@ -93,4 +104,15 @@
 .todoTextCell {
     width: 400px;
     overflow: hidden;
+}
+.todoRow {
+    margin-bottom: 5px; /* Reduce spacing between rows */
+}
+
+.todoTextCell {
+    padding: 5px; /* Adjust padding for task text */
+}
+
+.dueDate {
+    padding-left: 10px; /* Add spacing between text and due date */
 }
