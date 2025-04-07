@@ -54,16 +54,12 @@ module.exports = NodeHelper.create({
 			if (response.statusCode === 200) {
 				var tasks = JSON.parse(body);
 			
-				// Log tasks to ensure they are fetched correctly
-				if (self.config.debug) {
-					console.log("Fetched tasks:", tasks);
-				}
+				tasks.forEach((item) => {
+					item.contentHtml = markdown.makeHtml(item.content); // Convert content to HTML
+				});
 			
-				// Send tasks to frontend
-				self.sendSocketNotification("TASKS", tasks);
-			} else {
-				console.error("Todoist API request failed with status code:", response.statusCode);
-			}						
+				self.sendSocketNotification("TASKS", tasks); // Send tasks directly as an array
+			}									
 		});
 	}
 });
