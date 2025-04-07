@@ -116,3 +116,17 @@
 .dueDate {
     padding-left: 10px; /* Add spacing between text and due date */
 }
+@keyframes flash {
+    0% { color: red; font-weight: bold; text-transform: uppercase; }
+    50% { color: transparent; font-weight: bold; text-transform: uppercase; }
+    100% { color: red; font-weight: bold; text-transform: uppercase; }
+}
+
+.overdue.flash {
+    animation-name: flash;
+    animation-duration: 1s;
+    animation-iteration-count: infinite;
+    background-color: transparent; /* Ensure background remains unchanged */
+    font-weight: bold; /* Make text bold */
+    text-transform: uppercase; /* Capitalize text */
+}
