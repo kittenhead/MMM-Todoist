@@ -29,19 +29,17 @@ module.exports = NodeHelper.create({
 	fetchTodos : function() {
 		var self = this;
 		//request.debug = true;
-		var acessCode = self.config.accessToken;
+		var accessToken = self.config.accessToken;
+
+		// Change request format (old Sync API -> REST v2):
 		request({
-			url: self.config.apiBase + "/" + self.config.apiVersion + "/" + self.config.todoistEndpoint + "/",
-			method: "POST",
+			url: self.config.apiBase + "/tasks", // Updated endpoint
+			method: "GET", // Changed from POST to GET
 			headers: {
-				"content-type": "application/x-www-form-urlencoded",
-				"cache-control": "no-cache",
-				"Authorization": "Bearer " + acessCode
+				"Authorization": "Bearer " + accessToken,
+				"Content-Type": "application/json"
 			},
-			form: {
-				sync_token: "*",
-				resource_types: self.config.todoistResourceType
-			}
+		// Remove old 'form' parameters
 		},
 		function(error, response, body) {
 			if (error) {
@@ -54,18 +52,18 @@ module.exports = NodeHelper.create({
 				console.log(body);
 			}
 			if (response.statusCode === 200) {
-				var taskJson = JSON.parse(body);
-				taskJson.items.forEach((item)=>{
-					item.contentHtml = markdown.makeHtml(item.content);
-				});
-
-				taskJson.accessToken = acessCode;
-				self.sendSocketNotification("TASKS", taskJson);
-			}
-			else{
-				console.log("Todoist api request status="+response.statusCode);
-			}
-
+				var tasks = JSON.parse(body);
+			
+				// Log tasks to ensure they are fetched correctly
+				if (self.config.debug) {
+					console.log("Fetched tasks:", tasks);
+				}
+			
+				// Send tasks to frontend
+				self.sendSocketNotification("TASKS", tasks);
+			} else {
+				console.error("Todoist API request failed with status code:", response.statusCode);
+			}						
 		});
 	}
 });
