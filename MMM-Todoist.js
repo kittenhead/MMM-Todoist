@@ -234,25 +234,19 @@ Module.register("MMM-Todoist", {
 		}
 	},	
 
-	filterTodoistData: function (tasks) {
+	filterTodoistData: function(tasks) {
 		var self = this;
 		var items = [];
-		var labelIds = [];
 	
-		// Ensure tasks is a valid array
 		if (!tasks || !Array.isArray(tasks)) {
 			console.error("Invalid tasks data:", tasks);
 			return;
 		}
 	
 		// Process each task
-		tasks.forEach(function (item) {
-			// Ignore sub-tasks if configured
-			if (item.parent_id != null && !self.config.displaySubtasks) {
-				return;
-			}
+		tasks.forEach(function(item) {
+			if (item.parent_id != null && !self.config.displaySubtasks) return;
 	
-			// Filter by labels if configured
 			if (self.config.labels.length > 0 && item.labels.length > 0) {
 				for (let label of item.labels) {
 					for (let labelName of self.config.labels) {
@@ -264,10 +258,9 @@ Module.register("MMM-Todoist", {
 				}
 			}
 	
-			// Filter by projects if configured
 			if (self.config.projects.length > 0) {
-				self.config.projects.forEach(function (project) {
-					if (item.project_id == project) {
+				self.config.projects.forEach(function(project) {
+					if (String(item.project_id) === String(project)) {
 						items.push(item);
 						return;
 					}
@@ -275,13 +268,19 @@ Module.register("MMM-Todoist", {
 			}
 		});
 	
-		// Sort and slice tasks based on configuration
+		// Sort by due date descending
+		if (self.config.sortType === "dueDateDesc") {
+			items.sort((a, b) => {
+				const dateA = a.due?.date ? new Date(a.due.date) : new Date(0);
+				const dateB = b.due?.date ? new Date(b.due.date) : new Date(0);
+				return dateB - dateA;
+			});
+		}
+	
 		items = items.slice(0, this.config.maximumEntries);
 	
-		this.tasks = {
-			items: items,
-		};
-	},	
+		this.tasks = { items: items };
+	},		
 	/*
 	 * The Todoist API returns task due dates as strings in these two formats: YYYY-MM-DD and YYYY-MM-DDThh:mm:ss
 	 * This depends on whether a task only has a due day or a due day and time. You cannot pass this date string into
@@ -290,17 +289,14 @@ Module.register("MMM-Todoist", {
 	 * otherwise it is local time. The parseDueDate function keeps Dates consistent by interpreting them all relative
 	 * to the same timezone.
 	 */
-	parseDueDate: function (date) {
-		if (!date) return null; // Handle cases where 'date' is null
-		let [year, month, day, hour = 0, minute = 0, second = 0] = date.split(/\D/).map(Number);
-	
-		// If the date ends with 'Z', it's in UTC format
-		if (date.endsWith("Z")) {
-			return new Date(Date.UTC(year, month - 1, day, hour, minute, second));
-		}
-	
-		// Otherwise, treat it as local time
-		return new Date(year, month - 1, day, hour, minute, second);
+	parseDueDate: function(date) {
+		if (!date) return null;
+		
+		// Handle both date-only and datetime formats
+		const isoDate = date.endsWith("Z") ? date : date + "T00:00:00Z";
+		const parsedDate = new Date(isoDate);
+		
+		return isNaN(parsedDate) ? null : parsedDate;
 	},	
 	sortByTodoist: function (itemstoSort) {
 		itemstoSort.sort(function (a, b) {
